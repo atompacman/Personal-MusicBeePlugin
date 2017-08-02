@@ -1,41 +1,59 @@
-﻿// MIT License
-// 
-// Copyright (c) 2012 Atompacman
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-// associated documentation files (the "Software"), to deal in the Software without restriction,
-// including without limitation the rights to use, copy, modify, merge, publish, distribute,
-// sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all copies or
-// substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-// NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+﻿// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// MIT License
+// Copyright (c) 2012 Stained Glass Guild
+// See file "LICENSE.txt" at project root for complete license
+// ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~
+// File: Plugin.cs
+// Creation: 2012-07
+// Author: Jérémie Coulombe
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
-using MusicBeePlugin.LibraryProcessor;
-using MusicBeePlugin.Processor;
+using MusicBeePlugin.Processor.Framework;
 
 namespace MusicBeePlugin
 {
    public partial class Plugin
    {
+      #region Compile-time constants
+
+      private const int CONFIG_WINDOW_ELEMENT_HEIGHT = 36;
+      private const string CONFIG_FILE_NAME = "AMLPConfig.dat";
+
+      #endregion
+
       #region Runtime constants
 
-      private static readonly List<ALibraryProcessor> PROCESSORS;
+      private static readonly List<ILibraryProcessor> PROCESSORS;
       private static readonly SharedLibraryData SHARED_LIB_DATA;
+      private static readonly List<CheckBox> ENABLED_PROCESSORS_CHECKBOXES;
+
+      #endregion
+
+      #region Static fields
+
+      public static MusicBeeApiInterface MusicBeeApi;
+
+      #endregion
+
+      #region Properties
+
+      private static string ConfigFilePath
+      {
+         get
+         {
+            string settingsPath = MusicBeeApi.Setting_GetPersistentStoragePath();
+            return settingsPath + "\\" + CONFIG_FILE_NAME;
+         }
+      }
 
       #endregion
 
@@ -43,13 +61,13 @@ namespace MusicBeePlugin
 
       static Plugin()
       {
-         PROCESSORS = new List<ALibraryProcessor>();
+         PROCESSORS = new List<ILibraryProcessor>();
 
          var requiredTags = new HashSet<MetaDataType>();
 
          foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
          {
-            if (!typeof(ALibraryProcessor).IsAssignableFrom(type) || type.IsAbstract)
+            if (!typeof(ILibraryProcessor).IsAssignableFrom(type) || type.IsAbstract)
             {
                continue;
             }
@@ -64,16 +82,18 @@ namespace MusicBeePlugin
             }
 
             var ctors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
-            if ((ctors.Length != 1) || (ctors[0].GetParameters().Length != 0))
+            if (ctors.Length != 1 || ctors[0].GetParameters().Length != 0)
             {
                throw new Exception();
             }
 
-            PROCESSORS.Add(ctors[0].Invoke(BindingFlags.Default, null, new object[] {},
-               CultureInfo.CurrentCulture) as ALibraryProcessor);
+            PROCESSORS.Add(ctors[0].Invoke(BindingFlags.Default, null, new object[] { },
+               CultureInfo.CurrentCulture) as ILibraryProcessor);
          }
 
          SHARED_LIB_DATA = new SharedLibraryData(requiredTags);
+
+         ENABLED_PROCESSORS_CHECKBOXES = new List<CheckBox>(PROCESSORS.Count);
       }
 
       #endregion
@@ -82,37 +102,33 @@ namespace MusicBeePlugin
 
       public PluginInfo Initialise(IntPtr a_ApiInterfacePtr)
       {
-         var musicBeeApi = new MusicBeeApiInterface();
-         musicBeeApi.Initialise(a_ApiInterfacePtr);
+         MusicBeeApi.Initialise(a_ApiInterfacePtr);
 
-         foreach (var processor in PROCESSORS)
-         {
-            processor.MusicBeeApi = musicBeeApi;
-         }
-         SHARED_LIB_DATA.MusicBeeApi = musicBeeApi;
-
-         musicBeeApi.MB_AddMenuItem(
+         MusicBeeApi.MB_AddMenuItem(
             "mnuTools/Atompacman's Music Library Processors",
             "Run Atompacman's Music Library Processors",
             (a_Sender, a_Args) =>
             {
                SHARED_LIB_DATA.Update();
 
-               foreach (var processor in PROCESSORS)
+               for (int i = 0; i < PROCESSORS.Count; ++i)
                {
-                  processor.Process(SHARED_LIB_DATA);
+                  if (ENABLED_PROCESSORS_CHECKBOXES[i].Checked)
+                  {
+                     PROCESSORS[i].Process(SHARED_LIB_DATA);
+                  }
                }
 
                foreach (string songUrl in SHARED_LIB_DATA.SongTags.Keys)
                {
-                  musicBeeApi.Library_CommitTagsToFile(songUrl);
+                  MusicBeeApi.Library_CommitTagsToFile(songUrl);
                }
             });
 
          return new PluginInfo
          {
             Author = "Atompacman",
-            ConfigurationPanelHeight = PROCESSORS.Count * 30,
+            ConfigurationPanelHeight = PROCESSORS.Count * CONFIG_WINDOW_ELEMENT_HEIGHT,
             Description = "Various music library processors",
             MinApiRevision = MinApiRevision,
             MinInterfaceVersion = MinInterfaceVersion,
@@ -129,20 +145,36 @@ namespace MusicBeePlugin
 
       public bool Configure(IntPtr a_PanelHandle)
       {
+         ENABLED_PROCESSORS_CHECKBOXES.Clear();
+
+         var enabledProcessorsTypeNames = new HashSet<string>();
+
+         if (File.Exists(ConfigFilePath))
+         {
+            foreach (string line in File.ReadAllLines(ConfigFilePath))
+            {
+               enabledProcessorsTypeNames.Add(line);
+            }
+         }
+
          var controls = new List<Control>();
 
-         for (int i = 0; i < 3; ++i)
+         for (int i = 0; i < PROCESSORS.Count; ++i)
          {
-            controls.Add(new CheckBox
+            var checkbox = new CheckBox
             {
                AutoSize = true,
-               Location = new Point(0, 3 + i * 40)
-            });
+               Location = new Point(0, 3 + i * CONFIG_WINDOW_ELEMENT_HEIGHT),
+               Checked = enabledProcessorsTypeNames.Contains(PROCESSORS[i].GetType().Name)
+            };
+
+            ENABLED_PROCESSORS_CHECKBOXES.Add(checkbox);
+            controls.Add(checkbox);
             controls.Add(new Label
             {
                AutoSize = true,
-               Location = new Point(20, i * 40),
-               Text = "prompt:"
+               Location = new Point(20, i * CONFIG_WINDOW_ELEMENT_HEIGHT),
+               Text = PROCESSORS[i].GetType().Name
             });
          }
 
@@ -155,19 +187,26 @@ namespace MusicBeePlugin
 
       public void SaveSettings()
       {
-         // Called by MusicBee when the user clicks Apply or Save in the MusicBee Preferences screen.
-         // its up to you to figure out whether anything has changed and needs updating.
-         // (Setting_GetPersistentStoragePath)
+         var stream = File.CreateText(ConfigFilePath);
+
+         for (int i = 0; i < PROCESSORS.Count; ++i)
+         {
+            if (ENABLED_PROCESSORS_CHECKBOXES[i].Checked)
+            {
+               stream.Write(PROCESSORS[i].GetType().Name + stream.NewLine);
+            }
+         }
+
+         stream.Flush();
+         stream.Close();
       }
 
       public void Close(PluginCloseReason a_Reason)
-      {
-         // MusicBee is closing the plugin (plugin is being disabled by user or MusicBee is shutting down).
-      }
+      { }
 
       public void Uninstall()
       {
-         // Uninstall this plugin. Clean up any persisted files
+         File.Delete(ConfigFilePath);
       }
 
       public void ReceiveNotification(string a_SourceFileUrl, NotificationType a_Type)

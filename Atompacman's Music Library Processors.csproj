@@ -78,15 +78,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Processor\AlbumRatingUpdater.cs" />
-    <Compile Include="Processor\RequiredTagsAttribute.cs" />
-    <Compile Include="Processor\SharedLibraryData.cs" />
+    <Compile Include="Processor\Framework\RequiredTagsAttribute.cs" />
+    <Compile Include="Processor\Framework\SharedLibraryData.cs" />
     <Compile Include="Processor\SongsToDeletePlaylistUpdater.cs" />
     <Compile Include="Processor\BadRatingTagValuePlaylistUpdater.cs" />
-    <Compile Include="Processor\ASimplePlaylistUpdater.cs" />
+    <Compile Include="Processor\Framework\ASimplePlaylistUpdater.cs" />
     <Compile Include="MusicBeeInterface.cs" />
     <Compile Include="Processor\MissingArtworkPlaylistUpdater.cs" />
-    <Compile Include="Processor\APlaylistUpdater.cs" />
-    <Compile Include="Processor\ALibraryProcessor.cs" />
+    <Compile Include="Processor\Framework\APlaylistUpdater.cs" />
+    <Compile Include="Processor\Framework\ILibraryProcessor.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

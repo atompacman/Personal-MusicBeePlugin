@@ -1,27 +1,18 @@
-﻿// MIT License
-// 
-// Copyright (c) 2017 Atompacman
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-// associated documentation files (the "Software"), to deal in the Software without restriction,
-// including without limitation the rights to use, copy, modify, merge, publish, distribute,
-// sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all copies or
-// substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
-// NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+﻿// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// MIT License
+// Copyright (c) 2017 Stained Glass Guild
+// See file "LICENSE.txt" at project root for complete license
+// ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~
+// File: SharedLibraryData.cs
+// Creation: 2017-08
+// Author: Jérémie Coulombe
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MusicBeePlugin.LibraryProcessor
+namespace MusicBeePlugin.Processor.Framework
 {
    public sealed class SharedLibraryData
    {
@@ -32,8 +23,6 @@ namespace MusicBeePlugin.LibraryProcessor
       #endregion
 
       #region Properties
-
-      public Plugin.MusicBeeApiInterface MusicBeeApi { get; set; }
 
       // Song URL -> Tag -> Value
       public Dictionary<string, Dictionary<Plugin.MetaDataType, string>> SongTags { get; }
@@ -62,7 +51,7 @@ namespace MusicBeePlugin.LibraryProcessor
 
          var fileUrls = new string[0];
 
-         if (!MusicBeeApi.Library_QueryFilesEx("", ref fileUrls))
+         if (!Plugin.MusicBeeApi.Library_QueryFilesEx("", ref fileUrls))
          {
             throw new Exception();
          }
@@ -75,8 +64,8 @@ namespace MusicBeePlugin.LibraryProcessor
 
             if (tagsToFetch.Length != 0)
             {
-               string[] tagValues = {};
-               if (!MusicBeeApi.Library_GetFileTags(fileUrl, tagsToFetch, ref tagValues))
+               string[] tagValues = { };
+               if (!Plugin.MusicBeeApi.Library_GetFileTags(fileUrl, tagsToFetch, ref tagValues))
                {
                   throw new Exception();
                }
@@ -98,16 +87,16 @@ namespace MusicBeePlugin.LibraryProcessor
 
       private void UpdatePlaylists()
       {
-         if (!MusicBeeApi.Playlist_QueryPlaylists())
+         if (!Plugin.MusicBeeApi.Playlist_QueryPlaylists())
          {
             throw new Exception();
          }
 
          string playlistUrl;
 
-         while ((playlistUrl = MusicBeeApi.Playlist_QueryGetNextPlaylist()) != null)
+         while ((playlistUrl = Plugin.MusicBeeApi.Playlist_QueryGetNextPlaylist()) != null)
          {
-            string playlistName = MusicBeeApi.Playlist_GetName(playlistUrl);
+            string playlistName = Plugin.MusicBeeApi.Playlist_GetName(playlistUrl);
             Playlists.Add(Tuple.Create(playlistUrl, playlistName));
          }
       }
