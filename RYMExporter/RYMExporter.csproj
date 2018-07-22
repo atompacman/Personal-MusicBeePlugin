@@ -41,12 +41,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Source\Interface.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="Source\Interface.Designer.cs">
-      <DependentUpon>Interface.cs</DependentUpon>
-    </Compile>
     <Compile Include="Source\MusicBeeInterface.cs" />
     <Compile Include="Source\RYMExporter.cs" />
   </ItemGroup>
@@ -56,11 +50,6 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Source\Interface.resx">
-      <DependentUpon>Interface.cs</DependentUpon>
-    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
